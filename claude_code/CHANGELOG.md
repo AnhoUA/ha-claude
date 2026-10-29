@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- `anthropic_api_key` більше не показується на вкладці Configuration за замовчуванням: доповнення працює з підпискою claude.ai, а ключ можна задати через **Show unused optional configuration options**.
+
 ## 0.4.0
 
 - Образ став мінімальним: Go, `build-base`, GitHub CLI і SSH-клієнт перенесено в окреме доповнення [ha-claude-go-dev](https://github.com/AnhoUA/ha-claude-go-dev).

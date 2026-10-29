@@ -1,5 +1,5 @@
 name: Claude Code
-version: "0.4.0"
+version: "0.4.1"
 slug: claude_code
 description: Claude Code CLI у веб-терміналі Home Assistant з Remote Control і постійним сховищем
 url: https://github.com/AnhoUA/ha-claude
@@ -25,7 +25,6 @@ options:
   remote_control: true
   session_name: Home Assistant
   storage_path: /share/claude
-  anthropic_api_key: ""
 schema:
   remote_control: bool
   session_name: str
