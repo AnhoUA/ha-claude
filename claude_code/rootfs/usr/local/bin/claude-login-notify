@@ -19,16 +19,26 @@ extract_url() {
         END { if (found) print url }'
 }
 
+# Повідомлення йдуть у лог доповнення (вкладка Log у HA)
+log() {
+    echo "[claude-login] $*"
+}
+
 call_ha() {
-    curl -s -o /dev/null -X POST \
+    local status
+    status=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
         -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d "$2" "${API}/$1"
+        -d "$2" "${API}/$1")
+    log "persistent_notification.$1 → HTTP ${status}"
 }
 
 while sleep 3; do
     url=$(extract_url)
     if [ -n "${url}" ] && [ "${url}" != "${last_url}" ]; then
+        # Посилання одним рядком: з вкладки Log його легко скопіювати, навіть якщо сповіщення не дійшло
+        log "Посилання для входу в Claude:"
+        log "${url}"
         message=$(jq -n --arg url "${url}" '"1. [Відкрити сторінку входу в Claude](\($url))\n2. Увійдіть і скопіюйте код.\n3. Вставте код у термінал **Claude** у бічній панелі й натисніть Enter."')
         call_ha create "$(jq -n --arg id "${NOTIFICATION_ID}" --argjson msg "${message}" \
             '{notification_id: $id, title: "Claude Code: вхід", message: $msg}')"
