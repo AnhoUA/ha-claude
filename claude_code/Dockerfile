@@ -30,6 +30,7 @@ ENV USE_BUILTIN_RIPGREP=0 \
 # вони додають свої скрипти в /etc/claude/init.d/, а run.sh виконує їх перед стартом Claude
 COPY rootfs/ /
 RUN chmod a+x /run.sh /usr/local/bin/claude-start /usr/local/bin/claude-storage \
+        /usr/local/bin/claude-login-notify \
     && mkdir -p /etc/claude/init.d
 
 CMD ["/run.sh"]

@@ -1,0 +1,41 @@
+#!/bin/bash
+# Стежить за вікном tmux із Claude і, коли там з'являється посилання для входу,
+# надсилає його в Home Assistant як сповіщення. У веб-терміналі довге посилання
+# розбите на кілька рядків, тож скопіювати його мишею незручно.
+
+NOTIFICATION_ID="claude_code_login"
+API="http://supervisor/core/api/services/persistent_notification"
+last_url=""
+
+# Склеює посилання: Claude розбиває його на рядки на всю ширину панелі,
+# тому кожен повний рядок продовжується наступним
+extract_url() {
+    local width
+    width=$(tmux display-message -p -t claude '#{pane_width}' 2>/dev/null) || return
+    tmux capture-pane -p -t claude 2>/dev/null | awk -v w="${width}" '
+        !found && /^https:\/\/[^ ]*oauth/ { found = 1; url = $0; full = (length($0) >= w); next }
+        found && full && !/ / { url = url $0; full = (length($0) >= w); next }
+        found { exit }
+        END { if (found) print url }'
+}
+
+call_ha() {
+    curl -s -o /dev/null -X POST \
+        -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$2" "${API}/$1"
+}
+
+while sleep 3; do
+    url=$(extract_url)
+    if [ -n "${url}" ] && [ "${url}" != "${last_url}" ]; then
+        message=$(jq -n --arg url "${url}" '"1. [Відкрити сторінку входу в Claude](\($url))\n2. Увійдіть і скопіюйте код.\n3. Вставте код у термінал **Claude** у бічній панелі й натисніть Enter."')
+        call_ha create "$(jq -n --arg id "${NOTIFICATION_ID}" --argjson msg "${message}" \
+            '{notification_id: $id, title: "Claude Code: вхід", message: $msg}')"
+        last_url="${url}"
+    elif [ -z "${url}" ] && [ -n "${last_url}" ]; then
+        # Посилання зникло з екрана: вхід завершено або скасовано
+        call_ha dismiss "$(jq -n --arg id "${NOTIFICATION_ID}" '{notification_id: $id}')"
+        last_url=""
+    fi
+done

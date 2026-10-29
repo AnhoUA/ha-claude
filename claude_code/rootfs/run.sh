@@ -35,6 +35,12 @@ export CLAUDE_SESSION_NAME="$(bashio::config 'session_name')"
 # навіть якщо панель у Home Assistant ще не відкривали
 tmux new-session -d -s claude -c /homeassistant /usr/local/bin/claude-start
 
+# Посилання для входу в Claude надсилається сповіщенням у HA
+/usr/local/bin/claude-login-notify &
+
+# macOptionClickForcesSelection: на Mac виділення з Option працює навіть тоді,
+# коли tmux перехоплює мишу (на Windows і Linux для цього є Shift)
 bashio::log.info "Запуск веб-термінала на порту 7681"
 exec ttyd -W -p 7681 -t fontSize=14 -t disableLeaveAlert=true \
+    -t macOptionClickForcesSelection=true \
     tmux new-session -A -s claude -c /homeassistant bash
