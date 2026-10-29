@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Образ став мінімальним: Go, `build-base`, GitHub CLI і SSH-клієнт перенесено в окреме доповнення [ha-claude-go-dev](https://github.com/AnhoUA/ha-claude-go-dev).
+- Прибрано опції `git_user_name`, `git_user_email` і `github_token`, тепер вони є в ha-claude-go-dev.
+- Додано хуки запуску `/etc/claude/init.d/*.sh`, щоб похідні доповнення могли розширювати образ.
+- Workflow збирання тепер reusable (`workflow_call`), тож похідні доповнення збираються й випускаються так само.
+- `safe.directory` більше не дублюється в `~/.gitconfig` після кожного перезапуску.
+
 ## 0.3.0
 
 - Перший публічний реліз.

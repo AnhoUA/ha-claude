@@ -1,7 +1,7 @@
 name: Claude Code
-version: "0.3.0"
+version: "0.4.0"
 slug: claude_code
-description: Claude Code CLI у веб-терміналі Home Assistant з Remote Control, Go та git
+description: Claude Code CLI у веб-терміналі Home Assistant з Remote Control і постійним сховищем
 url: https://github.com/AnhoUA/ha-claude
 # Готові образи збирає GitHub Actions (.github/workflows/build.yaml); HA їх лише завантажує
 image: ghcr.io/anhoua/{arch}-addon-claude_code
@@ -26,14 +26,8 @@ options:
   session_name: Home Assistant
   storage_path: /share/claude
   anthropic_api_key: ""
-  git_user_name: ""
-  git_user_email: ""
-  github_token: ""
 schema:
   remote_control: bool
   session_name: str
   storage_path: match(^/(share|media)/.+)
   anthropic_api_key: password?
-  git_user_name: str?
-  git_user_email: email?
-  github_token: password?

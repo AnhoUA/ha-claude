@@ -3,10 +3,17 @@
 Доповнення для Home Assistant OS, яке запускає **Claude Code** у веб-терміналі в бічній панелі HA.
 
 - Claude стартує разом із доповненням у режимі **Remote Control**, тож сесією можна керувати з claude.ai або мобільного застосунку Claude.
-- Усередині є **Go** (з `gcc` для cgo), **git**, **GitHub CLI (`gh`)** і SSH-клієнт.
 - Є доступ до конфігурації HA (`/homeassistant`), до `/share` і до HA API.
 - **Постійне сховище** для скілів, агентів, команд, `CLAUDE.md` і проєктів, яке не залежить від контейнера.
-- Логін, ключі й кеші зберігаються між перезапусками та оновленнями.
+- Логін Claude зберігається між перезапусками та оновленнями.
+- Мінімальний образ: тільки Claude Code, `git`, `ripgrep`, `jq`, `curl` і `nano`. Додаткові інструменти дають похідні доповнення.
+
+### Варіанти
+
+| Доповнення | Репозиторій | Що всередині |
+|---|---|---|
+| **Claude Code** | [AnhoUA/ha-claude](https://github.com/AnhoUA/ha-claude) (цей) | чистий Claude Code |
+| **Claude Code Go Dev** | [AnhoUA/ha-claude-go-dev](https://github.com/AnhoUA/ha-claude-go-dev) | усе з Claude Code, а також Go, `gh`, SSH і налаштування git |
 
 > Підтримувані архітектури: `amd64` (NUC, x86-ПК, віртуальні машини) і `aarch64` (Raspberry Pi 4/5, HA Green/Yellow). 32-бітні системи не підтримуються.
 
@@ -47,9 +54,6 @@
 | `session_name` | `Home Assistant` | Назва сесії в списку Remote Control |
 | `storage_path` | `/share/claude` | Постійне сховище для скілів і проєктів. Має бути в `/share/...` або `/media/...` |
 | `anthropic_api_key` | — | API-ключ Anthropic. Якщо його задано, Remote Control вимикається: він працює лише з підпискою claude.ai |
-| `git_user_name` | — | `git config user.name` |
-| `git_user_email` | — | `git config user.email` |
-| `github_token` | — | Personal access token GitHub для `git push/pull` по HTTPS і для `gh` |
 
 Збережіть налаштування й перезапустіть доповнення.
 
@@ -89,8 +93,9 @@ claude --remote-control "Home Assistant"
 
 | | `/share/claude` | `/data` (`$HOME`) |
 |---|---|---|
-| Що там | скіли, агенти, команди, `CLAUDE.md`, проєкти | логін Claude, токени, `~/.ssh`, `~/.gitconfig`, історія сесій, Go-кеш |
+| Що там | скіли, агенти, команди, `CLAUDE.md`, проєкти | логін Claude, історія сесій, `~/.gitconfig` |
 | Після видалення доповнення | **залишається** | видаляється |
+| Спільне для всіх варіантів | так: Claude Code і Go Dev бачать ті самі скіли | ні, у кожного доповнення свій |
 | Доступ із комп'ютера | так, через Samba: `\\homeassistant.local\share\claude` | ні |
 | Видно іншим доповненням | так | ні |
 | Потрапляє в бекапи HA | так (папка Share) | так (разом із доповненням) |
@@ -101,43 +106,30 @@ claude --remote-control "Home Assistant"
 
 ---
 
-## Git і GitHub
+## Похідні доповнення
 
-Є три способи авторизуватися в GitHub. Усі дані зберігаються в `/data`.
+Образ `ghcr.io/anhoua/{arch}-addon-claude_code:<версія>` задуманий як база для інших доповнень. Так побудовано [ha-claude-go-dev](https://github.com/AnhoUA/ha-claude-go-dev). Щоб зробити власний варіант:
 
-**Токен у налаштуваннях.** Створіть [fine-grained token](https://github.com/settings/personal-access-tokens) з доступом до потрібних репозиторіїв і вставте його в `github_token`. Після перезапуску працюють і `git`, і `gh`.
-
-**Вхід через `gh`.** У терміналі доповнення виконайте:
-```bash
-gh auth login
-gh auth setup-git
-```
-
-**SSH-ключ.** Створіть ключ:
-```bash
-ssh-keygen -t ed25519 -C "ha-claude"
-cat ~/.ssh/id_ed25519.pub
-```
-Потім додайте публічний ключ на GitHub у **Settings → SSH and GPG keys**.
-
-Щоб тримати конфігурацію HA під git:
-```bash
-cd /homeassistant
-git init
-git remote add origin git@github.com:<логін>/ha-config.git
-```
-Обов'язково додайте `secrets.yaml`, `.storage/` і `*.db` у `.gitignore`.
-
----
-
-## Go
-
-Встановлено Go з пакетів Alpine разом із `build-base` для cgo. `GOPATH=/data/go` і кеш збірки зберігаються між перезапусками, а `go install` кладе бінарники в `/data/go/bin`, який уже додано в `PATH`.
-
-```bash
-go version
-go install golang.org/x/tools/gopls@latest
-```
+1. **`build.yaml`:** вкажіть базою потрібну версію ha-claude:
+   ```yaml
+   build_from:
+     aarch64: ghcr.io/anhoua/aarch64-addon-claude_code:0.4.0
+     amd64: ghcr.io/anhoua/amd64-addon-claude_code:0.4.0
+   ```
+2. **`Dockerfile`:** використайте `FROM ${BUILD_FROM}`, додайте пакети через `apk add` і скопіюйте `rootfs/`. Задавати `CMD` не потрібно, він успадковується.
+3. **Хуки запуску:** покладіть скрипти в `rootfs/etc/claude/init.d/NN-назва.sh`. `run.sh` підключає їх через `source` перед стартом Claude, тож у них доступні `bashio::config` і `$HOME=/data`, а все, що вони експортують, побачить Claude.
+4. **`config.yaml`:** скопіюйте всі опції базового доповнення (`remote_control`, `session_name`, `storage_path`, `anthropic_api_key`), бо їх читає `run.sh`. Після них додайте свої.
+5. **CI:** викличте workflow з цього репозиторію:
+   ```yaml
+   jobs:
+     build:
+       uses: AnhoUA/ha-claude/.github/workflows/build.yaml@main
+       permissions:
+         contents: write
+         packages: write
+       with:
+         addon_dir: <тека доповнення>
+   ```
 
 ---
 
@@ -176,4 +168,4 @@ go install golang.org/x/tools/gopls@latest
 
 ### GHCR: пакети мають бути публічними
 
-Після першого успішного запуску відкрийте **github.com/orgs/AnhoUA/packages**. Для кожного з пакетів `amd64-addon-claude_code` і `aarch64-addon-claude_code` зайдіть у **Package settings → Change visibility → Public**. Без цього HA не зможе завантажити образ. Це потрібно зробити один раз.
+Після першого успішного запуску відкрийте **github.com/orgs/AnhoUA/packages**. Для кожного з пакетів `amd64-addon-claude_code` і `aarch64-addon-claude_code` зайдіть у **Package settings → Change visibility → Public**. Без цього HA не зможе завантажити образ, а CI похідних доповнень не зможе зібратися на його основі. Це потрібно зробити один раз.

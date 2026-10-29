@@ -10,31 +10,26 @@ LABEL io.hass.type="addon" \
 
 RUN apk add --no-cache \
         bash \
-        build-base \
         curl \
         git \
-        github-cli \
-        go \
         jq \
         nano \
         nodejs \
         npm \
-        openssh-client \
         ripgrep \
         tmux \
         ttyd \
     && npm install -g @anthropic-ai/claude-code \
     && npm cache clean --force
 
-# Claude Code на musl працює з системним ripgrep, а не з вбудованим.
-# Go-модулі та кеш збірки лежать у /data, щоб не завантажувати їх після кожного перезапуску.
+# Claude Code на musl працює з системним ripgrep, а не з вбудованим
 ENV USE_BUILTIN_RIPGREP=0 \
-    TERM=xterm-256color \
-    GOPATH=/data/go \
-    GOCACHE=/data/.cache/go-build \
-    PATH=/data/go/bin:${PATH}
+    TERM=xterm-256color
 
+# Образ слугує базою для похідних доповнень (наприклад, ha-claude-go-dev):
+# вони додають свої скрипти в /etc/claude/init.d/, а run.sh виконує їх перед стартом Claude
 COPY rootfs/ /
-RUN chmod a+x /run.sh /usr/local/bin/claude-start /usr/local/bin/claude-storage
+RUN chmod a+x /run.sh /usr/local/bin/claude-start /usr/local/bin/claude-storage \
+    && mkdir -p /etc/claude/init.d
 
 CMD ["/run.sh"]

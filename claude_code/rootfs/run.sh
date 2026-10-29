@@ -1,10 +1,9 @@
 #!/usr/bin/with-contenv bashio
 set -e
 
-# /data переживає перезапуски й оновлення: там лежать логін Claude, ~/.ssh, ~/.gitconfig, gh і Go-кеш
+# /data переживає перезапуски й оновлення: там лежать логін Claude та історія сесій
 export HOME=/data
-mkdir -p "${HOME}/.ssh"
-chmod 700 "${HOME}/.ssh"
+mkdir -p "${HOME}"
 cp -n /etc/claude/bashrc "${HOME}/.bashrc" 2>/dev/null || true
 
 STORAGE_PATH="$(bashio::config 'storage_path')"
@@ -16,19 +15,17 @@ if bashio::config.has_value 'anthropic_api_key'; then
     bashio::log.info "Використовується ANTHROPIC_API_KEY з налаштувань"
 fi
 
-# --- git ---
-if bashio::config.has_value 'git_user_name'; then
-    git config --global user.name "$(bashio::config 'git_user_name')"
-fi
-if bashio::config.has_value 'git_user_email'; then
-    git config --global user.email "$(bashio::config 'git_user_email')"
-fi
-git config --global --add safe.directory '*'
-if bashio::config.has_value 'github_token'; then
-    export GH_TOKEN="$(bashio::config 'github_token')"
-    gh auth setup-git
-    bashio::log.info "GitHub: використовується github_token з налаштувань"
-fi
+# Конфігурація HA належить іншому користувачу, тож без цього git відмовляється з нею працювати
+git config --global --replace-all safe.directory '*'
+
+# Розширення від похідних доповнень. Скрипти виконуються в цьому ж shell,
+# тож мають доступ до bashio і можуть експортувати змінні для Claude.
+for hook in /etc/claude/init.d/*.sh; do
+    [ -f "${hook}" ] || continue
+    bashio::log.info "init.d: $(basename "${hook}")"
+    # shellcheck source=/dev/null
+    source "${hook}"
+done
 
 # --- Claude у tmux ---
 export CLAUDE_REMOTE_CONTROL="$(bashio::config 'remote_control')"

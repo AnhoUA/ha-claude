@@ -1,10 +1,23 @@
 name: Build add-on
 
-# Версія береться з claude_code/config.yaml. Кожна нова версія публікується один раз:
-# образи ghcr.io/anhoua/{arch}-addon-claude_code:<версія>, git-тег v<версія> і GitHub Release.
+# Версія береться з <addon_dir>/config.yaml. Кожна нова версія публікується один раз:
+# образи <image_prefix>/{arch}-addon-<slug>:<версія>, git-тег v<версія> і GitHub Release.
 # Щоб випустити зміни, збільште version у config.yaml і додайте запис у CHANGELOG.md.
+#
+# Похідні доповнення (наприклад, AnhoUA/ha-claude-go-dev) викликають цей workflow через
+# workflow_call, тож збирання й випуск версій однакові в усіх репозиторіях.
 
 on:
+  workflow_call:
+    inputs:
+      addon_dir:
+        description: Тека доповнення з config.yaml, build.yaml і Dockerfile
+        type: string
+        required: true
+      image_prefix:
+        description: Реєстр і власник образів (у нижньому регістрі)
+        type: string
+        default: ghcr.io/anhoua
   push:
     branches: [main]
     paths:
@@ -15,13 +28,9 @@ on:
       - "claude_code/**"
       - ".github/workflows/build.yaml"
 
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
-  ADDON_DIR: claude_code
-  IMAGE_PREFIX: ghcr.io/anhoua
+  ADDON_DIR: ${{ inputs.addon_dir || 'claude_code' }}
+  IMAGE_PREFIX: ${{ inputs.image_prefix || 'ghcr.io/anhoua' }}
 
 jobs:
   prepare:
