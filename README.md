@@ -108,6 +108,8 @@ claude --remote-control "Home Assistant"
 
 ## Похідні доповнення
 
+Правила, що належить базі, а що похідним, контракт для похідних і процес випуску описано в [`AGENTS.md`](AGENTS.md). Claude Code підхоплює їх автоматично через `CLAUDE.md`.
+
 Образ `ghcr.io/anhoua/{arch}-addon-claude_code:<версія>` задуманий як база для інших доповнень. Так побудовано [ha-claude-go-dev](https://github.com/AnhoUA/ha-claude-go-dev). Щоб зробити власний варіант:
 
 1. **`build.yaml`:** вкажіть базою потрібну версію ha-claude:
