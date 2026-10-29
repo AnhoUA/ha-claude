@@ -2,6 +2,9 @@ name: Claude Code
 version: "0.3.0"
 slug: claude_code
 description: Claude Code CLI у веб-терміналі Home Assistant з Remote Control, Go та git
+url: https://github.com/AnhoUA/ha-claude
+# Готові образи збирає GitHub Actions (.github/workflows/build.yaml); HA їх лише завантажує
+image: ghcr.io/anhoua/{arch}-addon-claude_code
 arch:
   - aarch64
   - amd64

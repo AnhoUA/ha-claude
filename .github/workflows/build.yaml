@@ -1,0 +1,140 @@
+name: Build add-on
+
+# Версія береться з claude_code/config.yaml. Кожна нова версія публікується один раз:
+# образи ghcr.io/anhoua/{arch}-addon-claude_code:<версія>, git-тег v<версія> і GitHub Release.
+# Щоб випустити зміни, збільште version у config.yaml і додайте запис у CHANGELOG.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "claude_code/**"
+      - ".github/workflows/build.yaml"
+  pull_request:
+    paths:
+      - "claude_code/**"
+      - ".github/workflows/build.yaml"
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ADDON_DIR: claude_code
+  IMAGE_PREFIX: ghcr.io/anhoua
+
+jobs:
+  prepare:
+    name: Version check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      slug: ${{ steps.info.outputs.slug }}
+      publish: ${{ steps.info.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lint add-on
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: ./${{ env.ADDON_DIR }}
+
+      - name: Read version
+        id: info
+        run: |
+          version=$(awk -F'"' '/^version:/ {print $2}' "$ADDON_DIR/config.yaml")
+          slug=$(awk '/^slug:/ {print $2}' "$ADDON_DIR/config.yaml")
+          [ -n "$version" ] || { echo "::error::Не вдалося прочитати version з config.yaml"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+              echo "::error file=$ADDON_DIR/config.yaml::Версію $version уже випущено. Збільште version у config.yaml."
+              exit 1
+            fi
+            echo "::warning file=$ADDON_DIR/config.yaml::Версію $version уже випущено. Перед злиттям збільште version."
+          fi
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Версія: $version"
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Base image
+        id: base
+        run: |
+          from=$(awk -v a="${{ matrix.arch }}:" '$1 == a {print $2}' "$ADDON_DIR/build.yaml")
+          [ -n "$from" ] || { echo "::error::Немає базового образу для ${{ matrix.arch }} у build.yaml"; exit 1; }
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.ADDON_DIR }}
+          push: ${{ needs.prepare.outputs.publish == 'true' }}
+          build-args: |
+            BUILD_FROM=${{ steps.base.outputs.from }}
+            BUILD_ARCH=${{ matrix.arch }}
+            BUILD_VERSION=${{ needs.prepare.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.arch }}-addon-${{ needs.prepare.outputs.slug }}:${{ needs.prepare.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.arch }}-addon-${{ needs.prepare.outputs.slug }}:latest
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+  release:
+    name: Release v${{ needs.prepare.outputs.version }}
+    needs: [prepare, build]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          # Нотатки до релізу — розділ цієї версії з CHANGELOG.md
+          awk -v v="## $VERSION" '$0 == v {f=1; next} /^## / {f=0} f' "$ADDON_DIR/CHANGELOG.md" > notes.md
+          [ -s notes.md ] || echo "Версія $VERSION" > notes.md
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notes.md

@@ -16,14 +16,13 @@
 
 ### Спосіб 1: через репозиторій на GitHub (рекомендовано)
 
-1. Завантажте цей проєкт у свій GitHub-репозиторій і впишіть його адресу в поле `url` у [`repository.yaml`](repository.yaml).
-2. У Home Assistant відкрийте **Settings → Add-ons → Add-on Store**.
-3. Натисніть **⋮** (праворуч угорі) → **Repositories**.
-4. Вставте URL репозиторію, наприклад `https://github.com/AnhoUA/ha-claude`, і натисніть **Add**, потім **Close**.
-5. Оновіть сторінку. Доповнення **Claude Code** з'явиться внизу списку.
-6. Відкрийте його й натисніть **Install**. Перше встановлення займає 5–15 хвилин: HA збирає образ на місці.
+[![Додати репозиторій у Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FAnhoUA%2Fha-claude)
 
-Якщо репозиторій приватний, HA його не побачить. Тоді скористайтеся способом 2.
+1. У Home Assistant відкрийте **Settings → Add-ons → Add-on Store**.
+2. Натисніть **⋮** (праворуч угорі) → **Repositories**.
+3. Вставте `https://github.com/AnhoUA/ha-claude` і натисніть **Add**, потім **Close**.
+4. Оновіть сторінку. Доповнення **Claude Code** з'явиться внизу списку.
+5. Відкрийте його й натисніть **Install**. HA завантажить готовий образ для вашої архітектури з GHCR, на що піде хвилина-дві.
 
 ### Спосіб 2: локальне доповнення без GitHub
 
@@ -33,6 +32,8 @@
    - Через SSH з комп'ютера: `scp -r claude_code root@homeassistant.local:/addons/`
 3. **Settings → Add-ons → Add-on Store → ⋮ → Check for updates**.
 4. Доповнення з'явиться в розділі **Local add-ons**. Відкрийте його й натисніть **Install**.
+
+Щоб локальна копія збиралася з `Dockerfile` прямо на пристрої, а не завантажувала готовий образ, видаліть рядок `image:` з `/addons/claude_code/config.yaml`. Збирання займає 5–15 хвилин.
 
 ---
 
@@ -156,4 +157,23 @@ go install golang.org/x/tools/gopls@latest
 
 ## Оновлення
 
-Після змін у репозиторії збільште `version` у [`claude_code/config.yaml`](claude_code/config.yaml). HA запропонує оновлення, а образ перезбереться з найновішою версією Claude Code.
+Образи збирає GitHub Actions ([`.github/workflows/build.yaml`](.github/workflows/build.yaml)) на нативних раннерах для `amd64` і `aarch64`.
+
+### Як випустити нову версію
+
+1. Внесіть зміни в `claude_code/`.
+2. Збільште `version` у [`claude_code/config.yaml`](claude_code/config.yaml) за [SemVer](https://semver.org/lang/uk/): `0.3.0` → `0.3.1` для виправлень, `0.4.0` для нових можливостей, `1.0.0` для несумісних змін.
+3. Додайте розділ `## <версія>` у [`claude_code/CHANGELOG.md`](claude_code/CHANGELOG.md). HA показує його у вікні оновлення, а workflow бере звідти нотатки до релізу.
+4. Запуште зміни в `main`. Workflow:
+   - перевірить доповнення лінтером;
+   - збере й опублікує `ghcr.io/anhoua/{amd64,aarch64}-addon-claude_code:<версія>` (і `:latest`);
+   - створить git-тег `v<версія>` і GitHub Release.
+5. У HA з'явиться оновлення, і користувачі завантажать новий образ.
+
+Кожна версія публікується лише один раз. Якщо запушити зміни в `claude_code/` без нової версії, workflow впаде з підказкою збільшити `version`. У pull request-ах образи збираються без публікації, щоб перевірити, що збирання проходить.
+
+Під час кожного збирання встановлюється найновіший Claude Code, доступний на той момент. Щоб оновити Claude Code в образі, достатньо випустити нову патч-версію доповнення.
+
+### GHCR: пакети мають бути публічними
+
+Після першого успішного запуску відкрийте **github.com/orgs/AnhoUA/packages**. Для кожного з пакетів `amd64-addon-claude_code` і `aarch64-addon-claude_code` зайдіть у **Package settings → Change visibility → Public**. Без цього HA не зможе завантажити образ. Це потрібно зробити один раз.
