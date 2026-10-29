@@ -1,0 +1,30 @@
+#!/bin/bash
+# Підключає постійне сховище: скіли, агенти, команди, CLAUDE.md і проєкти лежать у $1,
+# а в ~/.claude на них ведуть симлінки. Логін і токени лишаються в $HOME (/data).
+set -e
+
+STORAGE="$1"
+mkdir -p "${STORAGE}/projects" "${HOME}/.claude"
+
+for dir in skills agents commands; do
+    mkdir -p "${STORAGE}/${dir}"
+    target="${HOME}/.claude/${dir}"
+    # Справжню теку з попереднього запуску переносимо в сховище, щоб нічого не загубити.
+    # Елементи, чиї імена вже зайняті в сховищі, лишаються в резервній теці поруч.
+    if [ -d "${target}" ] && [ ! -L "${target}" ]; then
+        for item in "${target}"/* "${target}"/.[!.]*; do
+            [ -e "${item}" ] || continue
+            [ -e "${STORAGE}/${dir}/$(basename "${item}")" ] || mv "${item}" "${STORAGE}/${dir}/"
+        done
+        rmdir "${target}" 2>/dev/null || mv "${target}" "${target}.bak-$(date +%s)"
+    fi
+    ln -sfn "${STORAGE}/${dir}" "${target}"
+done
+
+if [ -f "${HOME}/.claude/CLAUDE.md" ] && [ ! -L "${HOME}/.claude/CLAUDE.md" ] && [ ! -f "${STORAGE}/CLAUDE.md" ]; then
+    mv "${HOME}/.claude/CLAUDE.md" "${STORAGE}/CLAUDE.md"
+fi
+touch "${STORAGE}/CLAUDE.md"
+ln -sfn "${STORAGE}/CLAUDE.md" "${HOME}/.claude/CLAUDE.md"
+
+ln -sfn "${STORAGE}/projects" "${HOME}/projects"

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Запускає Claude у вікні tmux; після виходу з Claude лишає звичайний shell
+
+cd /homeassistant
+
+if [ "${CLAUDE_REMOTE_CONTROL}" = "true" ] && [ -z "${ANTHROPIC_API_KEY}" ]; then
+    claude --remote-control "${CLAUDE_SESSION_NAME}"
+else
+    if [ "${CLAUDE_REMOTE_CONTROL}" = "true" ]; then
+        echo "Remote Control працює лише з підпискою claude.ai, а задано API-ключ, тож запускаю без нього."
+    fi
+    claude
+fi
+
+echo
+echo "Claude завершив роботу. Щоб запустити знову: claude --remote-control \"${CLAUDE_SESSION_NAME}\""
+exec bash

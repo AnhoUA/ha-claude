@@ -1,0 +1,9 @@
+# Створюється при першому запуску; можна редагувати в /data/.bashrc
+export PS1='\[\e[1;35m\]claude@ha\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
+
+# Доступ до Home Assistant API: ha_api states/light.kitchen
+ha_api() {
+    curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        -H "Content-Type: application/json" \
+        "http://supervisor/core/api/$1" "${@:2}"
+}

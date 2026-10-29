@@ -1,0 +1,36 @@
+name: Claude Code
+version: "0.3.0"
+slug: claude_code
+description: Claude Code CLI у веб-терміналі Home Assistant з Remote Control, Go та git
+arch:
+  - aarch64
+  - amd64
+init: false
+ingress: true
+ingress_port: 7681
+panel_icon: mdi:robot
+panel_title: Claude
+homeassistant_api: true
+map:
+  - type: homeassistant_config
+    read_only: false
+  - type: share
+    read_only: false
+  - type: media
+    read_only: false
+options:
+  remote_control: true
+  session_name: Home Assistant
+  storage_path: /share/claude
+  anthropic_api_key: ""
+  git_user_name: ""
+  git_user_email: ""
+  github_token: ""
+schema:
+  remote_control: bool
+  session_name: str
+  storage_path: match(^/(share|media)/.+)
+  anthropic_api_key: password?
+  git_user_name: str?
+  git_user_email: email?
+  github_token: password?
